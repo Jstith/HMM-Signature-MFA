@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <title>{% block title %}CTF Site{% endblock %}</title>
+    </head>
+    <body>
+        <nav>
+            <a href="/">Home</a> | <a href="/register">Register</a> |
+            <a href="/login">Login</a> |
+            <a href="/dashboard">Dashboard</a>
+        </nav>
+        {% block content %}{% endblock %}
+    </body>
+</html>

@@ -1,0 +1,8 @@
+Flask
+Flask-WTF
+Flask-Login
+Flask-SQLAlchemy
+email-validator
+hmmlearn
+numpy
+flask-socketio
