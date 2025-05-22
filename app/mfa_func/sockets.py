@@ -4,7 +4,7 @@ import math
 
 user_states = {}
 sid_to_user = {}
-MAX_INK = 1000
+MAX_INK = 800
 
 def register_socket_events(socketio, db, User, train_model, query_user):
 
@@ -117,7 +117,7 @@ def register_socket_events(socketio, db, User, train_model, query_user):
                                 emit('status_message', {"message": "MFA model created!"}, to=sid)
                             else:
 
-                                emit('status_message', {"message": "Failed to build MFA model, please try again."}, to=sid)
+                                emit('status_message', {"message": "Failed to build MFA model, refresh to try again."}, to=sid)
                                 emit('update_content', {"new_html": 0, "button_disabled": "true"}, to=sid)
                             disconnect()
                             return
