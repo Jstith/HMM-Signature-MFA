@@ -5,27 +5,74 @@ content %}
 <script src="https://cdn.jsdelivr.net/npm/p5@1.6.0/lib/p5.min.js"></script>
 <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
 
-<h1>Set Up MFA</h1>
-<p>
-    To set up MFA, draw your initials in the provided box. NOTE: To ensure the
-    best results, draw your initials the same way each time. (This isn't the
-    grocery store... they actually have to match!)
-</p>
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow" style="max-width: 400px">
+                <div class="card-body px-4 pb-4">
+                    <h1 class="mb-3">Set up MFA</h1>
+                    <p>
+                        To set up MFA, draw your initials in the provided box
+                        three times. Detailed and percise initials result in a
+                        better MFA token (note: entries are timed for added
+                        consistency).
+                    </p>
 
-<bold>Enter your initials:</bold>
-<div id="token-counter">3</div>
-<bold>more times</bold>
+                    <span id="mfa-fail-text" hidden="True"
+                        ><h4>
+                            MFA failed due to parameter mis-match! Please
+                            refresh the page and try again (make sure to draw
+                            the same shape each time).
+                        </h4></span
+                    >
 
-<style>
-    body {
-        display: flex;
-        justify-content: center;
-        padding-top: 50px;
-    }
-    canvas {
-        border: 1px solid #ccc;
-    }
-</style>
+                    <p class="fw-bold d-inline">Enter your initials:</p>
+                    <div id="token-counter" class="d-inline mx-2">3</div>
+                    <p class="fw-bold d-inline">more times</p>
+                    <div
+                        id="canvas-container"
+                        class="my-3 d-flex justify-content-center"
+                    >
+                        <!-- Canvas will be inserted by p5.js -->
+                        <style>
+                            canvas {
+                                border: 1px solid #ccc;
+                                max-width: 100%;
+                                height: auto;
+                                display: block;
+                            }
+                        </style>
+                    </div>
+                    <div class="progress mb-4" style="height: 20px">
+                        <div
+                            id="inkBar"
+                            class="progress-bar bg-success"
+                            role="progressbar"
+                            style="width: 100%"
+                            aria-valuenow="100"
+                            aria-valuemin="0"
+                            aria-valuemax="100"
+                        ></div>
+                    </div>
+                    <div
+                        id="statusBar"
+                        class="mb-3"
+                        style="font-family: sans-serif; font-size: 16px"
+                    >
+                        Status: Ready
+                    </div>
+                    <button
+                        id="verify-button"
+                        class="btn btn-primary w-100 mb-4"
+                        disabled
+                    >
+                        Go to MFA Verification
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- Script logic for draw widget -->
 <script>
@@ -46,25 +93,50 @@ content %}
     });
 
     socket.on("ink_status", (data) => {
+        console.log(data);
+
         const bar = document.getElementById("inkBar");
         bar.style.width = `${data.percent}%`;
 
         if (data.percent < 30) {
-            bar.style.background = "#f44336"; // red
+            bar.classList.remove("bg-success", "bg-warning");
+            bar.classList.add("bg-danger");
         } else if (data.percent < 70) {
-            bar.style.background = "#ff9800"; // orange
+            bar.classList.remove("bg-success", "bg-danger");
+            bar.classList.add("bg-warning");
         } else {
-            bar.style.background = "#4caf50"; // green
+            bar.classList.remove("bg-warning", "bg-danger");
+            bar.classList.add("bg-success");
         }
     });
 
-    socket.on("disconnect", function (data) {
+    socket.on("disconnect", function () {
         canDraw = false;
+        inkOut = true;
     });
 
-    socket.on("update_content", function (data) {
-        document.getElementById("token-counter").innerHTML = data.new_html;
-        document.getElementById("verify-button").disabled = data.button_disabled;
+    document.addEventListener("DOMContentLoaded", function () {
+        const verifyButton = document.getElementById("verify-button");
+
+        if (verifyButton) {
+            verifyButton.addEventListener("click", function () {
+                if (!verifyButton.disabled) {
+                    window.location.href = "{{ url_for('mfa.verify_mfa') }}";
+                }
+            });
+        }
+
+        socket.on("update_content", (data) => {
+            const counter = document.getElementById("token-counter");
+
+            if (counter) {
+                counter.textContent = data.new_html;
+            }
+
+            if (verifyButton) {
+                verifyButton.disabled = data.button_disabled;
+            }
+        });
     });
 
     socket.on("reset_canvas", () => {
@@ -90,7 +162,8 @@ content %}
     }
 
     function setup() {
-        createCanvas(350, 350);
+        const canvas = createCanvas(350, 350);
+        canvas.parent("canvas-container");
         background(255);
         strokeWeight(6);
         stroke(0);
@@ -128,31 +201,5 @@ content %}
         }, fadeDelay);
     }
 </script>
-
-<div
-    style="
-        width: 350px;
-        height: 20px;
-        background: #eee;
-        border: 1px solid #ccc;
-        margin-bottom: 10px;
-    "
->
-    <div
-        id="inkBar"
-        style="height: 100%; width: 100%; background: #4caf50"
-    ></div>
-</div>
-
-<div
-    id="statusBar"
-    style="margin-top: 10px; font-family: sans-serif; font-size: 16px"
->
-    Status: Ready
-</div>
-
-<a href="{{ url_for('mfa.verify_mfa') }}">
-    <button id="verify-button", disabled=True">Go to MFA Verification</button>
-</a>
 
 {% endblock %}

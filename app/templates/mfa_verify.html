@@ -1,29 +1,75 @@
-{% extends "base.html" %} {% block title %}Verify MFA{% endblock %} {% block
+{% extends "base.html" %} {% block title %}MFA Setup{% endblock %} {% block
 content %}
 
 <!-- External scripts for draw widget -->
 <script src="https://cdn.jsdelivr.net/npm/p5@1.6.0/lib/p5.min.js"></script>
 <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
 
-<h1>Verify MFA</h1>
-<p>
-    To verify MFA, draw your initials in the provided box. It will be validated against your saved signatures in the database for a probabilistic match.
-</p>
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow" style="max-width: 400px">
+                <div class="card-body px-4 pb-4">
+                    <h1 class="mb-3">Verify MFA</h1>
+                    <p>
+                        Draw your initials in the provided box. They will be
+                        compared to your saved initials for a probabilistic
+                        match.
+                    </p>
+                    <p class="fw-bold d-inline">Enter your initials:</p>
+                    <div
+                        id="canvas-container"
+                        class="my-3 d-flex justify-content-center"
+                    >
+                        <!-- Canvas will be inserted by p5.js -->
+                        <style>
+                            canvas {
+                                border: 1px solid #ccc;
+                                max-width: 100%;
+                                height: auto;
+                                display: block;
+                            }
+                        </style>
+                    </div>
+                    <div class="progress mb-4" style="height: 20px">
+                        <div
+                            id="inkBar"
+                            class="progress-bar bg-success"
+                            role="progressbar"
+                            style="width: 100%"
+                            aria-valuenow="100"
+                            aria-valuemin="0"
+                            aria-valuemax="100"
+                        ></div>
+                    </div>
 
-<span id="mfa-fail-text" hidden="True"><h4>MFA Failed! You may refresh the page to try again.</h4></span>
-
-<bold>Enter your initials:</bold>
-
-<style>
-    body {
-        display: flex;
-        justify-content: center;
-        padding-top: 50px;
-    }
-    canvas {
-        border: 1px solid #ccc;
-    }
-</style>
+                    <div
+                        id="statusBar"
+                        class="mb-3"
+                        style="font-family: sans-serif; font-size: 16px"
+                    >
+                        Status: Ready
+                    </div>
+                    <span id="mfa-fail-text" hidden="True"
+                        ><strong>
+                            MFA Failed! Refresh the page to try again.
+                        </strong></span
+                    >
+                    <span id="mfa-pass-text" hidden="True"
+                        ><strong>MFA Passed!</strong></span
+                    >
+                    <button
+                        id="dashboard-button"
+                        class="btn btn-primary w-100 mb-4"
+                        disabled
+                    >
+                        Go to Dashboard
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- Script logic for draw widget -->
 <script>
@@ -44,29 +90,60 @@ content %}
     });
 
     socket.on("ink_status", (data) => {
+        console.log(data);
+
         const bar = document.getElementById("inkBar");
         bar.style.width = `${data.percent}%`;
 
         if (data.percent < 30) {
-            bar.style.background = "#f44336"; // red
+            bar.classList.remove("bg-success", "bg-warning");
+            bar.classList.add("bg-danger");
         } else if (data.percent < 70) {
-            bar.style.background = "#ff9800"; // orange
+            bar.classList.remove("bg-success", "bg-danger");
+            bar.classList.add("bg-warning");
         } else {
-            bar.style.background = "#4caf50"; // green
+            bar.classList.remove("bg-warning", "bg-danger");
+            bar.classList.add("bg-success");
         }
     });
 
-    socket.on("disconnect", function (data) {
-        canDraw = false;
-    });
-
     socket.on("mfa-passed", () => {
-      document.getElementById('dashboard-button').disabled = False;
+        document.getElementById("dashboard-button").disabled = false;
+        document.getElementById("mfa-pass-text").hidden = false;
     });
 
-    socket.io("mfa-failed", () => {
-      document.getElementById('mfa-fail-text').hidden = False;
-    })
+    socket.on("mfa-failed", () => {
+        document.getElementById("mfa-fail-text").hidden = false;
+    });
+
+    socket.on("disconnect", function () {
+        canDraw = false;
+        inkOut = true;
+    });
+
+    document.addEventListener("DOMContentLoaded", function () {
+        const dashboardButton = document.getElementById("dashboard-button");
+
+        if (dashboardButton) {
+            dashboardButton.addEventListener("click", function () {
+                if (!dashboardButton.disabled) {
+                    window.location.href = "{{ url_for('main.dashboard') }}";
+                }
+            });
+        }
+
+        socket.on("update_content", (data) => {
+            const counter = document.getElementById("token-counter");
+
+            if (counter) {
+                counter.textContent = data.new_html;
+            }
+
+            if (verifyButton) {
+                verifyButton.disabled = data.button_disabled;
+            }
+        });
+    });
 
     socket.on("reset_canvas", () => {
         reset(500, 1000);
@@ -91,7 +168,8 @@ content %}
     }
 
     function setup() {
-        createCanvas(350, 350);
+        const canvas = createCanvas(350, 350);
+        canvas.parent("canvas-container");
         background(255);
         strokeWeight(6);
         stroke(0);
@@ -129,31 +207,5 @@ content %}
         }, fadeDelay);
     }
 </script>
-
-<div
-    style="
-        width: 350px;
-        height: 20px;
-        background: #eee;
-        border: 1px solid #ccc;
-        margin-bottom: 10px;
-    "
->
-    <div
-        id="inkBar"
-        style="height: 100%; width: 100%; background: #4caf50"
-    ></div>
-</div>
-
-<div
-    id="statusBar"
-    style="margin-top: 10px; font-family: sans-serif; font-size: 16px"
->
-    Status: Ready
-</div>
-
-<a href="{{ url_for('main.dashboard') }}">
-    <button id="dashboard-button", disabled=True">Go to Dashboard</button>
-</a>
 
 {% endblock %}

@@ -48,6 +48,7 @@ def register_socket_events(socketio, db, User, train_model, query_user):
         if state is None:
             return
 
+        updated_this_iter = False
         x, y, t = data["x"], data["y"], data["t"]
         last_x, last_y, last_time = state['last_x'], state['last_y'], state['last_time']
 
@@ -83,7 +84,7 @@ def register_socket_events(socketio, db, User, train_model, query_user):
                         if(mfa_passed):
                             user.mfa_validated = True
                             db.session.commit()
-                            print("Passed MFA, just need to get the damn button working.")
+                            print("Passed MFA.")
                             emit('mfa-passed', to=sid)
                         else:
                             emit('mfa-failed', to=sid)
@@ -104,11 +105,20 @@ def register_socket_events(socketio, db, User, train_model, query_user):
                             handle_counter(tokens)
                             print("Training model")
                             model_b64, threshold = train_model(user_id, user_states[sid]['token_data']) # May need to reformat
-                            user.mfa_model = model_b64
-                            user.mfa_threshold = threshold
-                            user.mfa_enabled = True
-                            db.session.commit()
 
+                            print(f"Got model with threshold {threshold}")
+                            print(len(user_states[sid]['token_data']))
+
+                            if(threshold >= -600 and threshold <= -100):
+                                user.mfa_model = model_b64
+                                user.mfa_threshold = threshold
+                                user.mfa_enabled = True
+                                db.session.commit()
+                                emit('status_message', {"message": "MFA model created!"}, to=sid)
+                            else:
+
+                                emit('status_message', {"message": "Failed to build MFA model, please try again."}, to=sid)
+                                emit('update_content', {"new_html": 0, "button_disabled": "true"}, to=sid)
                             disconnect()
                             return
 
@@ -121,9 +131,10 @@ def register_socket_events(socketio, db, User, train_model, query_user):
                             user_states[sid]['last_x'] = None
                             user_states[sid]['last_y'] = None
                             user_states[sid]['last_time'] = None
+                            updated_this_iter = True
                             emit('reset_canvas', to=sid)
                             emit('status_message', {"message": "Draw MFA Pattern."}, to=sid)
-
-        state['last_x'] = x
-        state['last_y'] = y
-        state['last_time'] = t
+        if(not updated_this_iter):
+            state['last_x'] = x
+            state['last_y'] = y
+            state['last_time'] = t

@@ -10,8 +10,8 @@ from wtforms.validators import InputRequired, Length, ValidationError
 auth = Blueprint('auth', __name__)
 
 class RegisterForm(FlaskForm):
-    username = StringField("Username", validators=[InputRequired(), Length(min=4)])
-    password = PasswordField("Password", validators=[InputRequired(), Length(min=8)])
+    username = StringField("Username", validators=[InputRequired()])
+    password = PasswordField("Password", validators=[InputRequired()])
     submit = SubmitField("Register")
 
 class LoginForm(FlaskForm):
@@ -27,6 +27,12 @@ def load_user(user_id):
 def register():
     form = RegisterForm()
     if form.validate_on_submit():
+
+        existing_user = User.query.filter_by(username=form.username.data).first()
+        if(existing_user):
+            flash('Username already exists, please try again.')
+            return render_template('register.html', form=form)
+
         hashed_pw = generate_password_hash(form.password.data)
         new_user = User(username=form.username.data, password=hashed_pw)
         db.session.add(new_user)

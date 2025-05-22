@@ -3,5 +3,41 @@ content %}
 <h1>Dashboard</h1>
 <p>Welcome, {{ current_user.username }}!</p>
 <p>This is your secure dashboard. MFA has been verified.</p>
-<p><a href="/logout">Log out</a></p>
+<p>Come learn more about your MFA below...</p>
+
+<div class="container mt-5">
+    <!-- Bucket 1 -->
+    <div class="card mb-4 shadow-lg">
+        <div class="card-body">
+            <h3 class="card-title">Bucket 1</h3>
+            <p class="card-text">
+                This is the first bucket of data. Replace this text with dynamic
+                content.
+            </p>
+        </div>
+    </div>
+
+    <!-- Bucket 2 -->
+    <div class="card mb-4 shadow-lg">
+        <div class="card-body">
+            <h3 class="card-title">Bucket 2</h3>
+            <p class="card-text">
+                This is the second bucket of data. Replace this text with
+                dynamic content.
+            </p>
+        </div>
+    </div>
+
+    <!-- Bucket 3 -->
+    <div class="card mb-4 shadow-lg">
+        <div class="card-body">
+            <h3 class="card-title">Bucket 3</h3>
+            <p class="card-text">
+                This is the third bucket of data. Replace this text with dynamic
+                content.
+            </p>
+        </div>
+    </div>
+</div>
+
 {% endblock %}

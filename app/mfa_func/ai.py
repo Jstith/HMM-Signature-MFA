@@ -8,7 +8,7 @@ def train_model(user_id, inp_data):
 
     np_data = np.array(inp_data)
     num_sequences, sequence_length, num_features = np_data.shape
-    X = np_data.reshape(-1, 3)
+    X = np_data.reshape(-1, num_features)
     lengths = [len(inp_data[0]), len(inp_data[1]), len(inp_data[2])]
 
     n_states = 6

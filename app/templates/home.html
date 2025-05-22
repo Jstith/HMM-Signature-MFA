@@ -1,8 +1,20 @@
-{% extends "base.html" %} {% block title %}Home{% endblock %} {% block content
-%}
-<h1>Welcome to the CTF Portal</h1>
-<p>
-    This is the homepage. Please <a href="/login">log in</a> or
-    <a href="/register">register</a>.
-</p>
+{% extends "base.html" %} {% block title %}Welcome to the CTF Challenge{%
+endblock %} {% block content %}
+<main class="container">
+    <h1>Welcome to the CTF Portal</h1>
+    <p>
+        This is a Capture The Flag challenge website. If you're new, register an
+        account to get started. Already have an account? Head to the login page.
+    </p>
+
+    <div class="actions">
+        <a href="/register">
+            <button class="btn btn-secondary">Register</button>
+        </a>
+
+        <a href="/login">
+            <button class="btn btn-secondary">Login</button>
+        </a>
+    </div>
+</main>
 {% endblock %}
