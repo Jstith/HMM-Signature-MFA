@@ -1,0 +1,416 @@
+{% extends "base.html" %} {% block title %}Verify Gesture - Gesture Auth{%
+endblock %} {% block canvas_color %}#198754{% endblock %} {% block content %}
+<section class="py-5">
+    <div class="container px-5">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="text-center mb-5">
+                    <h1 class="fw-bolder mb-3">Verify Your Gesture</h1>
+                    <p class="lead text-muted">
+                        Click to start, move to draw, click again to finish
+                    </p>
+                </div>
+
+                <div class="card shadow border-0">
+                    <div class="card-body p-5">
+                        <div class="gesture-progress mb-4">
+                            <div
+                                id="progressBar"
+                                class="gesture-progress-bar progress-too-small"
+                                style="width: 0%"
+                            >
+                                <span id="progressText">0 / 20-80 samples</span>
+                            </div>
+                        </div>
+
+                        <div class="text-center mb-4">
+                            <div class="canvas-container">
+                                <canvas
+                                    id="gestureCanvas"
+                                    width="500"
+                                    height="500"
+                                ></canvas>
+                            </div>
+                        </div>
+
+                        <div
+                            class="d-grid gap-2 d-md-flex justify-content-md-center mb-3"
+                        >
+                            <button
+                                class="btn btn-success btn-lg px-4"
+                                id="submitBtn"
+                                disabled
+                            >
+                                <i class="bi bi-shield-check me-2"></i>Verify
+                                Gesture
+                            </button>
+                            <button
+                                class="btn btn-outline-secondary btn-lg px-4"
+                                id="clearBtn"
+                            >
+                                <i class="bi bi-arrow-clockwise me-2"></i>Clear
+                            </button>
+                        </div>
+
+                        <div class="status-message">
+                            <div id="statusMessage"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %} {% block scripts %}
+<script>
+    const CONFIG = {
+        CANVAS_SIZE: 500,
+        SAMPLE_DISTANCE: 15,
+        SAMPLES: 120,
+        MIN_PATH_LENGTH: 500,
+        MAX_PATH_LENGTH: 2000,
+    };
+
+    const canvas = document.getElementById("gestureCanvas");
+    const ctx = canvas.getContext("2d");
+    const submitBtn = document.getElementById("submitBtn");
+    const clearBtn = document.getElementById("clearBtn");
+    const statusMessage = document.getElementById("statusMessage");
+    const progressBar = document.getElementById("progressBar");
+    const progressText = document.getElementById("progressText");
+
+    let isDrawing = false;
+    let drawingStarted = false;
+    let drawingComplete = false;
+    let gestureData = [];
+    let lastMeasuredPoint = null;
+    let totalDistance = 0;
+    let totalPathLength = 0;
+    let lastDrawPoint = null;
+    let maxSamplesReached = false;
+    let maxPathReached = false;
+
+    ctx.lineWidth = 3;
+    ctx.lineCap = "round";
+    ctx.strokeStyle = "#198754";
+
+    function getMousePos(e) {
+        const rect = canvas.getBoundingClientRect();
+        return {
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top,
+            timestamp: Date.now(),
+        };
+    }
+
+    function getTouchPos(e) {
+        const rect = canvas.getBoundingClientRect();
+        const touch = e.touches[0];
+        return {
+            x: touch.clientX - rect.left,
+            y: touch.clientY - rect.top,
+            timestamp: Date.now(),
+        };
+    }
+
+    function distance(p1, p2) {
+        return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+    }
+
+    function finishDrawing() {
+        if (!drawingStarted || drawingComplete) return;
+
+        isDrawing = false;
+        drawingComplete = true;
+        updateProgress();
+    }
+
+    function updateProgress() {
+        const samples = gestureData.length;
+        const percentage = Math.min((samples / CONFIG.SAMPLES) * 100, 100);
+
+        progressBar.style.width = percentage + "%";
+        progressText.textContent =
+            samples + " / " + CONFIG.SAMPLES + " samples";
+
+        const validSamples = samples === CONFIG.SAMPLES;
+        const validPathLength =
+            totalPathLength >= CONFIG.MIN_PATH_LENGTH &&
+            totalPathLength <= CONFIG.MAX_PATH_LENGTH;
+
+        if (
+            samples < CONFIG.SAMPLES ||
+            totalPathLength < CONFIG.MIN_PATH_LENGTH
+        ) {
+            progressBar.className = "gesture-progress-bar progress-too-small";
+            submitBtn.disabled = true;
+
+            if (!drawingComplete) {
+                if (samples < CONFIG.SAMPLES) {
+                    statusMessage.innerHTML =
+                        '<div class="alert alert-warning"><i class="bi bi-exclamation-triangle me-2"></i>Keep drawing! Need ' +
+                        (CONFIG.SAMPLES - samples) +
+                        " more samples.</div>";
+                } else {
+                    const neededLength = Math.ceil(
+                        CONFIG.MIN_PATH_LENGTH - totalPathLength,
+                    );
+                    statusMessage.innerHTML =
+                        '<div class="alert alert-warning"><i class="bi bi-exclamation-triangle me-2"></i>Keep drawing! Need ' +
+                        neededLength +
+                        " more pixels.</div>";
+                }
+            } else {
+                statusMessage.innerHTML =
+                    '<div class="alert alert-danger"><i class="bi bi-x-circle me-2"></i>Gesture too short. Clear and draw a longer gesture.</div>';
+            }
+        } else if (validSamples && validPathLength) {
+            progressBar.className = "gesture-progress-bar progress-ideal";
+            submitBtn.disabled = false;
+            if (drawingComplete) {
+                statusMessage.innerHTML =
+                    '<div class="alert alert-success"><i class="bi bi-check-circle me-2"></i>Perfect! Ready to verify!</div>';
+            } else {
+                statusMessage.innerHTML =
+                    '<div class="alert alert-info"><i class="bi bi-info-circle me-2"></i>Looking good! Click to finish.</div>';
+            }
+        } else if (
+            samples >= CONFIG.SAMPLES ||
+            totalPathLength >= CONFIG.MAX_PATH_LENGTH
+        ) {
+            progressBar.className = "gesture-progress-bar progress-ideal";
+            submitBtn.disabled = false;
+            statusMessage.innerHTML =
+                '<div class="alert alert-success"><i class="bi bi-check-circle me-2"></i>Maximum reached! Ready to verify!</div>';
+        }
+    }
+
+    function addMeasurement(pos) {
+        if (maxSamplesReached) return;
+
+        if (!lastMeasuredPoint) {
+            lastMeasuredPoint = pos;
+            gestureData.push(pos);
+            updateProgress();
+            return;
+        }
+
+        const dist = distance(lastMeasuredPoint, pos);
+        totalDistance += dist;
+
+        if (totalDistance >= CONFIG.SAMPLE_DISTANCE) {
+            if (gestureData.length < CONFIG.SAMPLES) {
+                gestureData.push(pos);
+                lastMeasuredPoint = pos;
+                totalDistance = 0;
+                updateProgress();
+            } else {
+                maxSamplesReached = true;
+                updateProgress();
+            }
+        }
+    }
+
+    canvas.addEventListener("click", (e) => {
+        if (e.button === 2) return;
+        if (drawingComplete) return;
+
+        if (!drawingStarted) {
+            isDrawing = true;
+            drawingStarted = true;
+
+            const pos = getMousePos(e);
+            ctx.beginPath();
+            ctx.moveTo(pos.x, pos.y);
+            lastMeasuredPoint = null;
+            totalDistance = 0;
+            lastDrawPoint = pos;
+            addMeasurement(pos);
+        } else if (isDrawing) {
+            finishDrawing();
+        }
+    });
+
+    canvas.addEventListener("mousemove", (e) => {
+        if (!isDrawing) return;
+
+        const pos = getMousePos(e);
+
+        if (lastDrawPoint) {
+            const segmentDist = distance(lastDrawPoint, pos);
+
+            if (totalPathLength + segmentDist > CONFIG.MAX_PATH_LENGTH) {
+                maxPathReached = true;
+                finishDrawing();
+                return;
+            }
+
+            totalPathLength += segmentDist;
+            lastDrawPoint = pos;
+        }
+
+        ctx.lineTo(pos.x, pos.y);
+        ctx.stroke();
+        addMeasurement(pos);
+
+        if (maxSamplesReached) {
+            finishDrawing();
+        }
+    });
+
+    let touchStartTime = 0;
+    canvas.addEventListener("touchstart", (e) => {
+        e.preventDefault();
+        touchStartTime = Date.now();
+
+        if (drawingComplete) return;
+
+        if (!drawingStarted) {
+            isDrawing = true;
+            drawingStarted = true;
+
+            const pos = getTouchPos(e);
+            ctx.beginPath();
+            ctx.moveTo(pos.x, pos.y);
+            lastMeasuredPoint = null;
+            totalDistance = 0;
+            lastDrawPoint = pos;
+            addMeasurement(pos);
+        }
+    });
+
+    canvas.addEventListener("touchmove", (e) => {
+        e.preventDefault();
+        if (!isDrawing) return;
+
+        const pos = getTouchPos(e);
+
+        if (lastDrawPoint) {
+            const segmentDist = distance(lastDrawPoint, pos);
+
+            if (totalPathLength + segmentDist > CONFIG.MAX_PATH_LENGTH) {
+                maxPathReached = true;
+                finishDrawing();
+                return;
+            }
+
+            totalPathLength += segmentDist;
+            lastDrawPoint = pos;
+        }
+
+        ctx.lineTo(pos.x, pos.y);
+        ctx.stroke();
+        addMeasurement(pos);
+
+        if (maxSamplesReached) {
+            finishDrawing();
+        }
+    });
+
+    canvas.addEventListener("touchend", (e) => {
+        e.preventDefault();
+        const touchDuration = Date.now() - touchStartTime;
+
+        if (touchDuration < 200 && isDrawing && drawingStarted) {
+            finishDrawing();
+        }
+    });
+
+    clearBtn.addEventListener("click", () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        gestureData = [];
+        lastMeasuredPoint = null;
+        totalDistance = 0;
+        totalPathLength = 0;
+        lastDrawPoint = null;
+        maxSamplesReached = false;
+        maxPathReached = false;
+        isDrawing = false;
+        drawingStarted = false;
+        drawingComplete = false;
+        progressBar.style.width = "0%";
+        progressText.textContent = "0 / " + CONFIG.SAMPLES + " samples";
+        progressBar.className = "gesture-progress-bar progress-too-small";
+        submitBtn.disabled = true;
+        statusMessage.innerHTML = "";
+    });
+
+    submitBtn.addEventListener("click", async () => {
+        if (
+            gestureData.length !== CONFIG.SAMPLES ||
+            totalPathLength < CONFIG.MIN_PATH_LENGTH ||
+            totalPathLength > CONFIG.MAX_PATH_LENGTH
+        ) {
+            return;
+        }
+
+        statusMessage.innerHTML =
+            '<div class="alert alert-info"><i class="bi bi-hourglass-split me-2"></i>Verifying...</div>';
+        submitBtn.disabled = true;
+
+        try {
+            const response = await fetch('{{ url_for("verify") }}', {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    gesture: gestureData,
+                    pathLength: totalPathLength,
+                }),
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                if (result.verified) {
+                    statusMessage.innerHTML =
+                        '<div class="alert alert-success"><i class="bi bi-check-circle-fill me-2"></i>Verification Successful! Redirecting...</div>';
+
+                    // Redirect to success page
+                    setTimeout(() => {
+                        window.location.href = '{{ url_for("success") }}';
+                    }, 1500);
+                } else {
+                    statusMessage.innerHTML =
+                        '<div class="alert alert-danger"><i class="bi bi-x-circle-fill me-2"></i>Verification Failed. Please try again.</div>';
+                }
+
+                if (!result.verified) {
+                    setTimeout(() => {
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        gestureData = [];
+                        lastMeasuredPoint = null;
+                        totalDistance = 0;
+                        totalPathLength = 0;
+                        lastDrawPoint = null;
+                        maxSamplesReached = false;
+                        maxPathReached = false;
+                        isDrawing = false;
+                        drawingStarted = false;
+                        drawingComplete = false;
+                        progressBar.style.width = "0%";
+                        progressText.textContent =
+                            "0 / " + CONFIG.SAMPLES + " samples";
+                        progressBar.className =
+                            "gesture-progress-bar progress-too-small";
+                        statusMessage.innerHTML = "";
+                    }, 2000);
+                }
+            } else {
+                statusMessage.innerHTML =
+                    '<div class="alert alert-danger"><i class="bi bi-exclamation-circle me-2"></i>' +
+                    result.error +
+                    "</div>";
+                submitBtn.disabled = false;
+            }
+        } catch (error) {
+            statusMessage.innerHTML =
+                '<div class="alert alert-danger"><i class="bi bi-exclamation-circle me-2"></i>Error: ' +
+                error.message +
+                "</div>";
+            submitBtn.disabled = false;
+        }
+    });
+</script>
+{% endblock %}

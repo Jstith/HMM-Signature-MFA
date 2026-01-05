@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Login - Gesture Auth{% endblock %}
+{% block canvas_color %}#198754{% endblock %}
+{% block content %}
+<section class="py-5">
+    <div class="container px-5">
+        <div class="row justify-content-center">
+            <div class="col-lg-6">
+                <div class="text-center mb-5">
+                    <h1 class="fw-bolder mb-3">Welcome Back</h1>
+                    <p class="lead text-muted">
+                        Step 1: Enter your credentials
+                    </p>
+                </div>
+
+                <div class="card shadow border-0">
+                    <div class="card-body p-5">
+                        <form id="loginForm">
+                            <div class="mb-4">
+                                <label for="username" class="form-label">Username</label>
+                                <input
+                                    type="text"
+                                    class="form-control form-control-lg"
+                                    id="username"
+                                    name="username"
+                                    required
+                                    autocomplete="username"
+                                    placeholder="Enter username"
+                                >
+                            </div>
+
+                            <div class="mb-4">
+                                <label for="password" class="form-label">Password</label>
+                                <input
+                                    type="password"
+                                    class="form-control form-control-lg"
+                                    id="password"
+                                    name="password"
+                                    required
+                                    autocomplete="current-password"
+                                    placeholder="Enter password"
+                                >
+                            </div>
+
+                            <div id="statusMessage" class="mb-3"></div>
+
+                            <div class="d-grid">
+                                <button type="submit" class="btn btn-success btn-lg">
+                                    <i class="bi bi-box-arrow-in-right me-2"></i>Continue to MFA
+                                </button>
+                            </div>
+                        </form>
+
+                        <div class="text-center mt-4">
+                            <a href="{{ url_for('landing') }}" class="text-muted">
+                                <i class="bi bi-arrow-left me-2"></i>Back to home
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+        const statusMessage = document.getElementById('statusMessage');
+
+        try {
+            const response = await fetch('{{ url_for("login") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ username, password })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                statusMessage.innerHTML = '<div class="alert alert-success"><i class="bi bi-check-circle me-2"></i>' + data.message + '</div>';
+                setTimeout(() => {
+                    window.location.href = '{{ url_for("verify_page") }}';
+                }, 1000);
+            } else {
+                statusMessage.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-circle me-2"></i>' + data.error + '</div>';
+            }
+        } catch (error) {
+            statusMessage.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-circle me-2"></i>An error occurred. Please try again.</div>';
+        }
+    });
+</script>
+{% endblock %}
